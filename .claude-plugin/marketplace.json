@@ -1,0 +1,51 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "woofi-skills",
+  "description": "WOOFi Swap API skills for AI coding assistants — trading stats, volume by source, earn vault TVL, and WOO staking data across 13 blockchain networks",
+  "owner": {
+    "name": "WOOFi"
+  },
+  "metadata": {
+    "description": "WOOFi Swap API skills for querying trading statistics, integrator volume breakdown, earn vault yields, and WOO token staking metrics"
+  },
+  "plugins": [
+    {
+      "name": "woofi-skills",
+      "source": "./",
+      "description": "4 WOOFi Swap API skills — trading volume and stats, volume by integrator source, earn vault TVL and APY, and WOO staking APR across 13 chains with no authentication required",
+      "version": "1.0.0",
+      "author": {
+        "name": "WOOFi"
+      },
+      "homepage": "https://woofi.com",
+      "license": "MIT",
+      "keywords": [
+        "skills",
+        "woofi",
+        "dex",
+        "web3",
+        "defi",
+        "swap",
+        "token",
+        "blockchain",
+        "staking",
+        "tvl",
+        "yield",
+        "trading"
+      ],
+      "category": "web3",
+      "tags": [
+        "skills",
+        "dex",
+        "swap",
+        "defi",
+        "staking",
+        "tvl",
+        "yield",
+        "blockchain",
+        "trading"
+      ],
+      "strict": false
+    }
+  ]
+}

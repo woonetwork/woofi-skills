@@ -1,0 +1,26 @@
+{
+  "name": "woofi-skills",
+  "version": "1.0.0",
+  "description": "WOOFi Swap API integration skills for querying trading stats, volume by source, earn TVL, and WOO staking data across 13 blockchain networks",
+  "author": {
+    "name": "WOOFi",
+    "url": "https://woofi.com"
+  },
+  "skills": [
+    "./skills/"
+  ],
+  "keywords": [
+    "skills",
+    "woofi",
+    "dex",
+    "web3",
+    "defi",
+    "swap",
+    "token",
+    "blockchain",
+    "staking",
+    "tvl",
+    "yield",
+    "trading"
+  ]
+}
