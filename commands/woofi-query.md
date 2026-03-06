@@ -35,7 +35,7 @@ If the request is ambiguous, ask the user to clarify before making API calls.
 `1d` (hourly buckets), `1w`, `1m`, `3m`, `1y`, `all` (daily buckets)
 
 ### Network values
-`bsc`, `avalanche`, `polygon`, `arbitrum`, `optimism`, `linea`, `base`, `mantle`, `sonic`, `berachain`, `hyperevm`, `monad`, `solana`
+`bsc`, `avax`, `polygon`, `arbitrum`, `optimism`, `linea`, `base`, `mantle`, `sonic`, `berachain`, `hyperevm`, `monad`, `solana`
 
 Note: `/yield` only supports 10 networks — excludes `solana`, `hyperevm`, `monad`.
 

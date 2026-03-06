@@ -34,7 +34,7 @@ This skill queries the WOOFi Swap API `/yield` endpoint to retrieve TVL and yiel
 
 ### Supported Networks (10 networks)
 
-`bsc`, `avalanche`, `polygon`, `arbitrum`, `optimism`, `linea`, `base`, `mantle`, `sonic`, `berachain`
+`bsc`, `avax`, `polygon`, `arbitrum`, `optimism`, `linea`, `base`, `mantle`, `sonic`, `berachain`
 
 Note: Solana, HyperEVM, and Monad are **not** supported for the `/yield` endpoint.
 

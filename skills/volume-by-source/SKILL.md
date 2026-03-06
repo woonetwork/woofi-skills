@@ -33,7 +33,7 @@ This skill queries the WOOFi Swap API `/source_stat` endpoint to retrieve tradin
 
 ### Supported Networks
 
-`bsc`, `avalanche`, `polygon`, `arbitrum`, `optimism`, `linea`, `base`, `mantle`, `sonic`, `berachain`, `hyperevm`, `monad`, `solana`
+`bsc`, `avax`, `polygon`, `arbitrum`, `optimism`, `linea`, `base`, `mantle`, `sonic`, `berachain`, `hyperevm`, `monad`, `solana`
 
 ---
 

@@ -33,7 +33,7 @@ This skill queries the WOOFi Swap API `/stat` endpoint to retrieve trading stati
 
 ### Supported Networks
 
-`bsc`, `avalanche`, `polygon`, `arbitrum`, `optimism`, `linea`, `base`, `mantle`, `sonic`, `berachain`, `hyperevm`, `monad`, `solana`
+`bsc`, `avax`, `polygon`, `arbitrum`, `optimism`, `linea`, `base`, `mantle`, `sonic`, `berachain`, `hyperevm`, `monad`, `solana`
 
 ### Period Behavior
 
