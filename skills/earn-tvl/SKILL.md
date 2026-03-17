@@ -46,9 +46,9 @@ Note: Solana, HyperEVM, and Monad are **not** supported for the `/yield` endpoin
 |-------|------|-------------|
 | `token` | string | Vault token symbol (e.g., USDC, USDT, ETH) |
 | `apy` | number | Total APY as a percentage |
-| `tvl` | string | TVL in the token's smallest unit (e.g., wei for ETH, 6-decimal units for USDC) |
-| `decimals` | integer | Token decimals for TVL conversion |
-| `price` | number | Current USD price of the token |
+| `tvl` | string | Total value locked in this specific vault, denominated in USD and scaled by `10^decimals` |
+| `decimals` | integer | Decimal scaling for `tvl`; divide by `10^decimals` to get the actual USD amount |
+| `price` | number | Current USD price of the token; informational only and not needed for TVL conversion |
 | `loan_percentage` | number | Portion of APR from lending strategy |
 | `reserve_percentage` | number | Portion of APR from reserve strategy |
 | `lending_apr` | number | APR component from lending |
@@ -58,20 +58,17 @@ Note: Solana, HyperEVM, and Monad are **not** supported for the `/yield` endpoin
 
 ## TVL Conversion
 
-All `tvl` values are in the token's smallest unit. Convert to token amount with:
-```
-token_amount = tvl / 10^decimals
-```
+`tvl` is the total value locked for this specific vault, already denominated in USD.
 
-Then convert to USD:
-```
-usd_tvl = token_amount * price
-```
+Critical details:
+- The returned value is scaled by `10^decimals`, so divide by `10^decimals` to get the actual USD amount.
+- Do not treat `tvl` as a raw token amount.
+- No token price conversion is required.
+- Decimals vary by token and chain (for example, USDC is usually 6, while USDT is 18 on BSC but 6 on other chains). Always use the `decimals` field from the response.
 
-**Example**: If `tvl = "5000000000"`, `decimals = 6`, `price = 1.0` (USDC):
+**Example**: If `tvl = "5000000000"` and `decimals = 6`:
 ```
-token_amount = 5000000000 / 10^6 = 5000 USDC
-usd_tvl = 5000 * 1.0 = $5,000
+usd_tvl = 5000000000 / 10^6 = $5,000
 ```
 
 ---
@@ -84,7 +81,7 @@ GET https://api.woofi.com/yield?network=arbitrum
 ```
 
 ### Multi-chain TVL summary
-Query each supported network separately, convert `tvl` for each vault, and sum across all networks for a global TVL figure.
+Query each supported network separately, divide each vault `tvl` by `10^decimals` to get USD TVL, and sum across all networks for a global TVL figure.
 
 ---
 
@@ -108,13 +105,13 @@ Query each supported network separately, convert `tvl` for each vault, and sum a
 }
 ```
 
-Converted TVL: `12500000000000 / 10^6 = 12,500,000 USDC = $12,500,000`
+Converted TVL: `12500000000000 / 10^6 = $12,500,000`
 
 ---
 
 ## Common Use Cases
 
-1. **Global TVL report**: Query all 10 supported networks, convert each vault TVL, sum for total USD TVL
+1. **Global TVL report**: Query all 10 supported networks, divide each vault `tvl` by `10^decimals`, and sum for total USD TVL
 2. **Best yield comparison**: Sort vaults by `apy` descending to identify highest-yielding opportunities
 3. **Strategy breakdown**: Use `loan_percentage` and `reserve_percentage` to understand yield composition
 4. **Token-specific TVL**: Filter by `token` across networks to find total USDC or ETH TVL across the protocol
