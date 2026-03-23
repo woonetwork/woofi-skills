@@ -11,7 +11,9 @@ metadata:
 
 WOOFi is a decentralized exchange aggregator offering deep liquidity across 16 blockchain networks. This skill teaches you how to use the WOOFi public REST API to query trading volume, earn vault yields, WOO staking stats, user portfolios, perpetual trading data, and more.
 
-**Base URL**: `https://api.woofi.com`
+**Base URLs**:
+- Main API: `https://api.woofi.com`
+- Swap & Quote API: `https://sapi.woofi.com`
 **Authentication**: None required
 **Rate Limit**: 5 requests/second
 **Response Format**: All responses return `{"status": "ok"|"fail", "data": ...}`
@@ -38,28 +40,30 @@ WOOFi is a decentralized exchange aggregator offering deep liquidity across 16 b
 
 8. **Cross-chain queries**: Most endpoints require one request per network. Exceptions: `/multi_total_stat`, `/user_trading_volumes`, `/earn_summary`, `/stakingv2` aggregate automatically.
 
+9. **Native Token Address**: When querying swaps or quotes for native EVM assets (e.g., ETH, BNB, AVAX), always use the designated address `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`. If the `chain_id` for a specific network is unknown, you can query `/swap_support` to fetch it dynamically via `network_infos.chain_id`.
+
 ---
 
 ## Supported Networks
 
-| Network | Key | /stat | /yield | /earn_summary | /user_* | /integration |
-|---------|-----|-------|--------|---------------|---------|-------------|
-| BNB Chain | `bsc` | Yes | Yes | Yes | Yes | Yes |
-| Avalanche | `avax` | Yes | Yes | Yes | Yes | Yes |
-| Polygon | `polygon` | Yes | Yes | Yes | Yes | Yes |
-| Arbitrum | `arbitrum` | Yes | Yes | Yes | Yes | Yes |
-| Optimism | `optimism` | Yes | Yes | Yes | Yes | Yes |
-| Linea | `linea` | Yes | Yes | Yes | Yes | Yes |
-| Base | `base` | Yes | Yes | Yes | Yes | Yes |
-| Mantle | `mantle` | Yes | Yes | Yes | Yes | Yes |
-| Sonic | `sonic` | Yes | Yes | Yes | Yes | Yes |
-| Berachain | `berachain` | Yes | Yes | Yes | Yes | Yes |
-| HyperEVM | `hyperevm` | Yes | No | No | Yes | Yes |
-| Monad | `monad` | Yes | No | No | Yes | Yes |
-| Solana | `solana` | Yes | No | No | No | No |
-| Fantom | `fantom` | Yes | Yes | Paused | Yes | Yes |
-| zkSync | `zksync` | Yes | Yes | Paused | Yes | Yes |
-| Polygon zkEVM | `polygon_zkevm` | Yes | Yes | Paused | Yes | Yes |
+| Network | Key | Chain ID | /stat | /yield | /earn_summary | /user_* | /v1/swap |
+|---------|-----|----------|-------|--------|---------------|---------|----------|
+| BNB Chain | `bsc` | `56` | Yes | Yes | Yes | Yes | Yes |
+| Avalanche | `avax` | `43114` | Yes | Yes | Yes | Yes | Yes |
+| Polygon | `polygon` | `137` | Yes | Yes | Yes | Yes | Yes |
+| Arbitrum | `arbitrum` | `42161` | Yes | Yes | Yes | Yes | Yes |
+| Optimism | `optimism` | `10` | Yes | Yes | Yes | Yes | Yes |
+| Linea | `linea` | `59144` | Yes | Yes | Yes | Yes | Yes |
+| Base | `base` | `8453` | Yes | Yes | Yes | Yes | Yes |
+| Mantle | `mantle` | `5000` | Yes | Yes | Yes | Yes | Yes |
+| Sonic | `sonic` | `146` | Yes | Yes | Yes | Yes | Yes |
+| Berachain | `berachain` | `80094` | Yes | Yes | Yes | Yes | Yes |
+| HyperEVM | `hyperevm` | `999` | Yes | No | No | Yes | Yes |
+| Monad | `monad` | `10143` | Yes | No | No | Yes | Yes |
+| Solana | `solana` | (SVM) | Yes | No | No | No | No |
+| Fantom | `fantom` | `250` | Yes | Yes | Paused | Yes | Yes |
+| zkSync | `zksync` | `324` | Yes | Yes | Paused | Yes | Yes |
+| Polygon zkEVM | `polygon_zkevm` | `1101` | Yes | Yes | Paused | Yes | Yes |
 
 ---
 
@@ -557,6 +561,40 @@ Uses `Multicall3` to batch-call `WooPP.tokenInfos` and `Wooracle.state` contract
 
 ---
 
+## Section 8: Swap & Quote (v1)
+
+These endpoints provide aggregated token exchange rates and build transactions. **Note: These use the `https://sapi.woofi.com` base URL.**
+
+### POST /v1/quote
+
+Returns the current exchange rate and expected receive amount.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `chain_id` | Yes | Network chain ID (e.g., Base: `8453`, Arbitrum: `42161`) |
+| `sell_token` | Yes | Token to sell (address or symbol, Native: `0xEeeeeE...`) |
+| `buy_token` | Yes | Token to buy (address or symbol) |
+| `sell_amount` | Yes | Amount to sell as a string (e.g., `"1.5"`) |
+| `slippage_pct` | No | Max slippage percentage (default: `0.5` = 0.5%) |
+
+```bash
+curl -X POST "https://sapi.woofi.com/v1/quote" -H "Content-Type: application/json" -d '{"chain_id": 42161, "sell_token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "buy_token": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f", "sell_amount": "1000"}'
+```
+
+### POST /v1/swap
+
+Gets the quote and generates blockchain-ready transaction data.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| (All from quote) | Yes | `chain_id`, `sell_token`, `buy_token`, `sell_amount` |
+| `to` | Yes | Wallet address to receive the bought tokens |
+| `rebate_to` | Yes | Rebate receiving address (usually same as `to`) |
+
+**Response**: Includes `needs_approve` (boolean) and `tx_steps` (list of transactions to execute sequentially, such as Approve then Swap).
+
+---
+
 ## Quick Reference
 
 | # | Endpoint | Method | Key Params | Auto Cross-Chain |
@@ -582,6 +620,8 @@ Uses `Multicall3` to batch-call `WooPP.tokenInfos` and `Wooracle.state` contract
 | 19 | `/integration/pairs` | GET | — | Yes |
 | 20 | `/integration/tickers` | GET | — | Yes |
 | 21 | `/integration/pool_states` | GET | `network?` | Optional |
+| 22 | `/v1/quote` | POST | `chain_id`, `sell_token`, `buy_token`, `sell_amount` | No |
+| 23 | `/v1/swap` | POST | Quote params + `to`, `rebate_to` | No |
 
 ---
 
