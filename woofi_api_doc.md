@@ -282,3 +282,171 @@ This document provides a detailed overview of the WOOFi backend APIs, including 
     - **Other**: `sei` (hardcoded in swap_support only).
 5. **Paused Networks**: Some networks may be paused (currently: `fantom`, `zksync`, `polygon_zkevm`) and excluded from certain endpoints like `earn_summary`.
 6. **Caching**: Cache times vary per endpoint. Most user-specific endpoints cache for 5 seconds; static configuration like `swap_support` and `integration/pairs` caches for 1 hour; statistics endpoints vary by period.
+
+---
+
+## 7. WOOFi v1 Swap & Quote APIs
+
+This protocol supports aggregated quotes and transaction building, primarily for major EVM chains such as Base, Arbitrum, Ethereum, etc.
+
+### Basic Information
+- **Base URL**: `https://sapi.woofi.com/v1`
+- **Content-Type**: `application/json`
+
+---
+
+### 7.1. Get Quote (Quote)
+Returns the current token exchange rate and expected received amount, excluding transaction data.
+
+#### Interface Information
+- **Endpoint**: `/v1/quote`
+- **Method**: `POST`
+
+#### Request Parameters (QuoteRequest)
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `chain_id` | `int` | Yes | - | Chain ID (Base: `8453`, Arbitrum: `42161`, BSC: `56`, Polygon: `137`) |
+| `sell_token` | `str` | Yes | - | Sell token address or symbol (ETH/Native: `0xEeeeeE...`) |
+| `buy_token` | `str` | Yes | - | Buy token address or symbol |
+| `sell_amount` | `str` | Yes | - | Sell amount (human-readable string, e.g., `"1.5"`) |
+| `slippage_pct` | `float` | No | `0.5` | Maximum allowed slippage percentage (0.5 means 0.5%) |
+| `woofi_only` | `bool` | No | `false` | Whether to force routing through WOOFi only |
+
+#### Response Fields (QuoteResponse)
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `chain_id` | `int` | Chain ID |
+| `sell_token` | `str` | Sell token address |
+| `buy_token` | `str` | Buy token address |
+| `sell_amount` | `str` | Sell amount |
+| `buy_amount` | `str` | Expected buy amount |
+| `price` | `str` | Current execution price (Buy/Sell) |
+| `guaranteed_price` | `str` | Minimum guaranteed price after considering slippage |
+
+---
+
+### 7.2. Build Transaction (Swap)
+Gets the quote while generating transaction data that can be sent directly to the blockchain.
+
+#### Interface Information
+- **Endpoint**: `/v1/swap`
+- **Method**: `POST`
+
+#### Request Parameters (SwapRequest)
+In addition to `QuoteRequest` parameters, includes:
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `to` | `str` | Yes | Wallet address to receive the bought tokens |
+| `rebate_to` | `str` | Yes | Rebate receiving address (usually the same as `to`) |
+| `signer_address` | `str` | No | Signer address (used to check `needs_approve`) |
+
+#### Response Fields (SwapResponse)
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `needs_approve` | `bool` | Whether token approval is needed first |
+| `tx_steps` | `list[TxCall]` | List of transaction steps (Approve, Swap, etc.) |
+
+##### TxCall Structure
+- `to`: Interaction target address (contract address)
+- `data`: Transaction Hex data
+- `value`: Amount of Native token to send (Wei, string)
+- `desc`: Step description (e.g., "Approve USDC")
+
+---
+
+### Request and Response Examples
+
+#### Example 1: Base Chain ETH to USDC (Quote)
+**Request:**
+```json
+{
+  "chain_id": 8453,
+  "sell_token": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+  "buy_token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "sell_amount": "0.1"
+}
+```
+**Response:**
+```json
+{
+  "chain_id": 8453,
+  "sell_token": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+  "buy_token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "sell_amount": "0.1",
+  "buy_amount": "250.452130",
+  "price": "2504.5213",
+  "guaranteed_price": "2492.0000"
+}
+```
+
+#### Example 2: Arbitrum Chain USDC to WBTC (Swap)
+**Request:**
+```json
+{
+  "chain_id": 42161,
+  "sell_token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+  "buy_token": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+  "sell_amount": "1000",
+  "to": "0xAbc...123",
+  "rebate_to": "0xAbc...123",
+  "signer_address": "0xAbc...123"
+}
+```
+**Response:**
+```json
+{
+  "chain_id": 42161,
+  "sell_token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+  "buy_token": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+  "sell_amount": "1000",
+  "buy_amount": "0.01524300",
+  "price": "0.000015243",
+  "guaranteed_price": "0.000015167",
+  "needs_approve": true,
+  "tx_steps": [
+    {
+      "to": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "data": "0x095ea7b3...",
+      "value": "0",
+      "desc": "Approve USDC for WOOFi Router"
+    },
+    {
+      "to": "0x4c4AF8DBc524681930a27b2F1Af5bcC8062E6fB7",
+      "data": "0x...",
+      "value": "0",
+      "desc": "Swap 1000 USDC for WBTC via WOOFi"
+    }
+  ]
+}
+```
+
+---
+
+### Error Codes
+When a request fails, the API returns a 4xx or 5xx status code with the following error format:
+```json
+{
+  "code": "ERROR_CODE",
+  "message": "Human readable message",
+  "details": {}
+}
+```
+
+| Error Code | HTTP Status | Description |
+| :--- | :--- | :--- |
+| `UNSUPPORTED_CHAIN` | 400 | The chain_id is not supported |
+| `UNSUPPORTED_TOKEN` | 400 | The specified token is not supported on this chain |
+| `INVALID_AMOUNT` | 400 | The amount format is invalid or <= 0 |
+| `SAME_TOKEN` | 400 | Sell token and buy token are the same |
+| `INSUFFICIENT_LIQUIDITY` | 422 | Insufficient pool liquidity to complete the swap |
+| `SIMULATION_FAILED` | 422 | On-chain simulation failed (usually due to excessive slippage) |
+| `CHAIN_RPC_ERROR` | 502 | Node access failure |
+
+---
+
+### Common Token Addresses Reference (Native is always 0xEeeeeE...)
+- **Base**: USDC (`0x833589f...`), USDT (`0xfde4c96...`)
+- **Arbitrum**: USDC (`0xaf88d06...`), USDT (`0xfd086bc...`)
+- **BSC**: USDT (`0x55d3983...`)
+- **Polygon**: USDC (`0x3c499c5...`)
