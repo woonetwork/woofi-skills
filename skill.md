@@ -13,7 +13,7 @@ WOOFi is a decentralized exchange aggregator offering deep liquidity across 16 b
 
 **Base URLs**:
 - Main API: `https://api.woofi.com`
-- Swap & Quote API: `https://sapi.woofi.com`
+- Swap & Quote API (V2): `https://sapi.woofi.com`
 **Authentication**: None required
 **Rate Limit**: 5 requests/second
 **Response Format**: All responses return `{"status": "ok"|"fail", "data": ...}`
@@ -40,14 +40,17 @@ WOOFi is a decentralized exchange aggregator offering deep liquidity across 16 b
 
 8. **Cross-chain queries**: Most endpoints require one request per network. Exceptions: `/multi_total_stat`, `/user_trading_volumes`, `/earn_summary`, `/stakingv2` aggregate automatically.
 
-9. **Native Token Address**: When querying swaps or quotes for native EVM assets (e.g., ETH, BNB, AVAX), always use the designated address `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`. If the `chain_id` for a specific network is unknown, you can query `/swap_support` to fetch it dynamically via `network_infos.chain_id`.
+9. **Native Token Address**: When querying swaps or quotes for native EVM assets (e.g., ETH, BNB, AVAX), you can use the token symbol (e.g., `"ETH"`, `"BNB"`) or the address `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`.
+
+10. **V2 API Flexible Input**: The V2 swap/quote endpoints accept chain names (e.g., `"arbitrum"`) or chain IDs (e.g., `42161`), and token symbols (e.g., `"USDC"`) or addresses. No manual address lookup needed.
 
 ---
 
 ## Supported Networks
 
-| Network | Key | Chain ID | /stat | /yield | /earn_summary | /user_* | /v1/swap |
+| Network | Key | Chain ID | /stat | /yield | /earn_summary | /user_* | /v2/swap |
 |---------|-----|----------|-------|--------|---------------|---------|----------|
+| Ethereum | `ethereum` | `1` | Yes | Yes | Yes | Yes | Yes |
 | BNB Chain | `bsc` | `56` | Yes | Yes | Yes | Yes | Yes |
 | Avalanche | `avax` | `43114` | Yes | Yes | Yes | Yes | Yes |
 | Polygon | `polygon` | `137` | Yes | Yes | Yes | Yes | Yes |
@@ -59,7 +62,7 @@ WOOFi is a decentralized exchange aggregator offering deep liquidity across 16 b
 | Sonic | `sonic` | `146` | Yes | Yes | Yes | Yes | Yes |
 | Berachain | `berachain` | `80094` | Yes | Yes | Yes | Yes | Yes |
 | HyperEVM | `hyperevm` | `999` | Yes | No | No | Yes | Yes |
-| Monad | `monad` | `10143` | Yes | No | No | Yes | Yes |
+| Monad | `monad` | `143` | Yes | No | No | Yes | Yes |
 | Solana | `solana` | (SVM) | Yes | No | No | No | No |
 | Fantom | `fantom` | `250` | Yes | Yes | Paused | Yes | Yes |
 | zkSync | `zksync` | `324` | Yes | Yes | Paused | Yes | Yes |
@@ -561,37 +564,112 @@ Uses `Multicall3` to batch-call `WooPP.tokenInfos` and `Wooracle.state` contract
 
 ---
 
-## Section 8: Swap & Quote (v1)
+## Section 8: Swap & Quote (V2)
 
 These endpoints provide aggregated token exchange rates and build transactions. **Note: These use the `https://sapi.woofi.com` base URL.**
 
-### POST /v1/quote
+All V2 endpoints support **flexible input**:
+- **Chain**: accepts numeric chain ID (`42161`) or chain name (`"arbitrum"`)
+- **Token**: accepts EVM address (`"0xaf88..."`) or token symbol/name (`"USDC"`)
+
+### POST /v2/quote
 
 Returns the current exchange rate and expected receive amount.
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `chain_id` | Yes | Network chain ID (e.g., Base: `8453`, Arbitrum: `42161`) |
-| `sell_token` | Yes | Token to sell (address or symbol, Native: `0xEeeeeE...`) |
-| `buy_token` | Yes | Token to buy (address or symbol) |
-| `sell_amount` | Yes | Amount to sell as a string (e.g., `"1.5"`) |
-| `slippage_pct` | No | Max slippage percentage (default: `0.5` = 0.5%) |
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `chain` | int \| str | Yes | — | Chain ID or name |
+| `sell_token` | str | Yes | — | Token address or symbol |
+| `buy_token` | str | Yes | — | Token address or symbol |
+| `sell_amount` | str | Yes | — | Amount to sell (human-readable, e.g., `"1.5"`) |
+| `slippage_pct` | float | No | 0.5 | Slippage tolerance (%) |
+| `woofi_only` | bool | No | false | Restrict to WOOFi pools only |
 
 ```bash
-curl -X POST "https://sapi.woofi.com/v1/quote" -H "Content-Type: application/json" -d '{"chain_id": 42161, "sell_token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "buy_token": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f", "sell_amount": "1000"}'
+curl -X POST "https://sapi.woofi.com/v2/quote" -H "Content-Type: application/json" -d '{"chain": "arbitrum", "sell_token": "USDC", "buy_token": "WETH", "sell_amount": "1000"}'
 ```
 
-### POST /v1/swap
+**Response**: `chain`, `sell_token`, `buy_token`, `sell_amount`, `buy_amount`, `price`, `guaranteed_price`
+
+### POST /v2/swap
 
 Gets the quote and generates blockchain-ready transaction data.
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| (All from quote) | Yes | `chain_id`, `sell_token`, `buy_token`, `sell_amount` |
-| `to` | Yes | Wallet address to receive the bought tokens |
-| `rebate_to` | Yes | Rebate receiving address (usually same as `to`) |
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `chain` | int \| str | Yes | — | Chain ID or name |
+| `sell_token` | str | Yes | — | Token address or symbol |
+| `buy_token` | str | Yes | — | Token address or symbol |
+| `sell_amount` | str | Yes | — | Amount to sell (human-readable) |
+| `to` | str | Yes | — | Recipient address |
+| `rebate_to` | str | Yes | — | Rebate recipient address |
+| `slippage_pct` | float | No | 0.5 | Slippage tolerance (%) |
+| `signer_address` | str \| null | No | null | Signer address (for approve check) |
+| `woofi_only` | bool | No | false | Restrict to WOOFi pools only |
 
-**Response**: Includes `needs_approve` (boolean) and `tx_steps` (list of transactions to execute sequentially, such as Approve then Swap).
+**Response**: Includes `needs_approve` (boolean) and `tx_steps` (list of transactions to execute sequentially, such as Approve then Swap). Each tx_step has `to`, `data`, `value`, `chain`, `desc`.
+
+```bash
+curl -X POST "https://sapi.woofi.com/v2/swap" -H "Content-Type: application/json" -d '{"chain": "arbitrum", "sell_token": "USDC", "buy_token": "WETH", "sell_amount": "1000", "to": "0xYourWallet", "rebate_to": "0xYourWallet", "signer_address": "0xYourWallet"}'
+```
+
+### POST /v2/check_approval
+
+Check if a token approval is needed before swapping.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chain` | int \| str | Yes | Chain ID or name |
+| `sell_token` | str | Yes | Token address or symbol |
+| `owner` | str | Yes | User wallet address |
+| `sell_amount` | str | Yes | Amount to check (human-readable) |
+
+**Response**: `chain`, `sell_token`, `owner`, `spender`, `current_allowance`, `needs_approval`
+
+---
+
+## Section 9: Cross-Chain Swap (V2)
+
+These endpoints handle cross-chain swaps via Stargate bridge (LayerZero). **Base URL: `https://sapi.woofi.com`**
+
+### POST /v2/cross_chain/quote
+
+Get a price quote for a cross-chain swap.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `src_chain` | int \| str | Yes | — | Source chain ID or name |
+| `dst_chain` | int \| str | Yes | — | Destination chain ID or name |
+| `src_token` | str | Yes | — | Source token (resolved against `src_chain`) |
+| `dst_token` | str | Yes | — | Destination token (resolved against `dst_chain`) |
+| `src_amount` | str | Yes | — | Amount to sell (human-readable) |
+| `slippage_pct` | float | No | 1.0 | Slippage tolerance (%) |
+| `extra_fee_pct` | float | No | 0.0 | Additional fee (%) |
+
+**Response**: `src_chain`, `dst_chain`, `src_token`, `dst_token`, `src_bridge_token`, `dst_bridge_token`, `src_amount`, `net_src_amount`, `bridge_amount_in`, `bridge_amount_out`, `dst_amount`, `price_f`
+
+```bash
+curl -X POST "https://sapi.woofi.com/v2/cross_chain/quote" -H "Content-Type: application/json" -d '{"src_chain": "arbitrum", "dst_chain": "base", "src_token": "USDC", "dst_token": "USDC", "src_amount": "100"}'
+```
+
+### POST /v2/cross_chain/swap
+
+Build transaction(s) for a cross-chain swap.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `src_chain` | int \| str | Yes | — | Source chain ID or name |
+| `dst_chain` | int \| str | Yes | — | Destination chain ID or name |
+| `src_token` | str | Yes | — | Source token (resolved against `src_chain`) |
+| `dst_token` | str | Yes | — | Destination token (resolved against `dst_chain`) |
+| `src_amount` | str | Yes | — | Amount to sell (human-readable) |
+| `to` | str | Yes | — | Recipient address on destination chain |
+| `slippage_pct` | float | No | 1.0 | Slippage tolerance (%) |
+| `extra_fee_pct` | float | No | 0.0 | Additional fee (%) |
+| `signer_address` | str \| null | No | null | Signer address (for approve check) |
+| `airdrop_native_amount` | int | No | 0 | Native token airdrop on destination (uint128) |
+
+**Response**: All fields from cross_chain/quote, plus `native_fee` (LayerZero fee in source chain native token), `needs_approve`, `tx_steps` (`[approve?, crossSwap]`).
 
 ---
 
@@ -620,8 +698,11 @@ Gets the quote and generates blockchain-ready transaction data.
 | 19 | `/integration/pairs` | GET | — | Yes |
 | 20 | `/integration/tickers` | GET | — | Yes |
 | 21 | `/integration/pool_states` | GET | `network?` | Optional |
-| 22 | `/v1/quote` | POST | `chain_id`, `sell_token`, `buy_token`, `sell_amount` | No |
-| 23 | `/v1/swap` | POST | Quote params + `to`, `rebate_to` | No |
+| 22 | `/v2/quote` | POST | `chain`, `sell_token`, `buy_token`, `sell_amount` | No |
+| 23 | `/v2/swap` | POST | Quote params + `to`, `rebate_to` | No |
+| 24 | `/v2/check_approval` | POST | `chain`, `sell_token`, `owner`, `sell_amount` | No |
+| 25 | `/v2/cross_chain/quote` | POST | `src_chain`, `dst_chain`, `src_token`, `dst_token`, `src_amount` | Yes |
+| 26 | `/v2/cross_chain/swap` | POST | Cross-chain quote params + `to` | Yes |
 
 ---
 

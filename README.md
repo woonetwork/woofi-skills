@@ -4,7 +4,7 @@ A Claude Code plugin providing skills and commands for querying the [WOOFi Swap 
 
 ## Overview
 
-WOOFi Swap is a decentralized exchange aggregator offering deep liquidity and competitive pricing across 13 blockchain networks. This plugin gives Claude the ability to query WOOFi's public API to answer questions about trading volume, integrator sources, earn vault yields, WOO staking, user portfolios, perpetual trading, and more.
+WOOFi Swap is a decentralized exchange aggregator offering deep liquidity and competitive pricing across 16 blockchain networks. This plugin gives Claude the ability to query WOOFi's public API to answer questions about trading volume, integrator sources, earn vault yields, WOO staking, user portfolios, perpetual trading, single-chain swaps, and cross-chain swaps via Stargate bridge.
 
 **API Base URL**: `https://api.woofi.com`
 **Authentication**: None required
@@ -36,6 +36,33 @@ Query supported networks, DEXs, and tokens for WOOFi swaps.
 **Trigger phrases**: "swap support", "supported networks", "supported tokens", "which chains"
 
 **Endpoint**: `GET /swap_support`
+
+---
+
+### `check-approval`
+Check if a token approval is needed before swapping.
+
+**Trigger phrases**: "check approval", "token approval", "allowance", "needs approval"
+
+**Endpoint**: `POST /v2/check_approval`
+
+---
+
+### `cross-chain-quote`
+Get price quotes for cross-chain swaps via Stargate bridge.
+
+**Trigger phrases**: "cross chain quote", "bridge quote", "cross chain price"
+
+**Endpoint**: `POST /v2/cross_chain/quote`
+
+---
+
+### `cross-chain-swap`
+Build transactions for cross-chain swaps via Stargate bridge with token approvals.
+
+**Trigger phrases**: "cross chain swap", "bridge swap", "swap across chains"
+
+**Endpoint**: `POST /v2/cross_chain/swap`
 
 ---
 
@@ -169,25 +196,26 @@ A general-purpose command for querying any WOOFi API endpoint. Describe what you
 
 ## Supported Networks
 
-| Network | /stat | /source_stat | /token_stat | /yield | /earn_summary | /stakingv2 | /user_* | /integration |
-|---------|-------|--------------|-------------|--------|---------------|------------|---------|-------------|
-| BSC | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Avalanche | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Polygon | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Arbitrum | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Optimism | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Linea | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Base | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Mantle | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Sonic | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| Berachain | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes |
-| HyperEVM | Yes | Yes | Yes | No | — | — | Yes | Yes |
-| Monad | Yes | Yes | Yes | No | — | — | Yes | Yes |
-| Solana | Yes | Yes | Yes | No | — | — | No | — |
-| Fantom | Yes | Yes | Yes | Yes | Paused | — | Yes | Yes |
-| zkSync | Yes | Yes | Yes | Yes | Paused | — | Yes | Yes |
-| Polygon zkEVM | Yes | Yes | Yes | Yes | Paused | — | Yes | Yes |
-| (global) | — | — | — | — | — | Yes | — | — |
+| Network | /stat | /source_stat | /token_stat | /yield | /earn_summary | /stakingv2 | /user_* | /v2/swap | /v2/cross_chain |
+|---------|-------|--------------|-------------|--------|---------------|------------|---------|----------|----------------|
+| Ethereum | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| BSC | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Avalanche | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Polygon | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Arbitrum | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Optimism | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Linea | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Base | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Mantle | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Sonic | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| Berachain | Yes | Yes | Yes | Yes | Yes | — | Yes | Yes | Yes |
+| HyperEVM | Yes | Yes | Yes | No | — | — | Yes | Yes | Yes |
+| Monad | Yes | Yes | Yes | No | — | — | Yes | Yes | Yes |
+| Solana | Yes | Yes | Yes | No | — | — | No | No | No |
+| Fantom | Yes | Yes | Yes | Yes | Paused | — | Yes | Yes | Yes |
+| zkSync | Yes | Yes | Yes | Yes | Paused | — | Yes | Yes | Yes |
+| Polygon zkEVM | Yes | Yes | Yes | Yes | Paused | — | Yes | Yes | Yes |
+| (global) | — | — | — | — | — | Yes | — | — | — |
 
 ---
 
@@ -197,7 +225,8 @@ A general-purpose command for querying any WOOFi API endpoint. Describe what you
 - **Trader counts**: Do NOT sum `trader_count` across time buckets — each bucket is independently unique-per-period.
 - **Period `1d`**: Returns hourly buckets. All other periods return daily buckets.
 - **User endpoints**: Period values are `7d`, `14d`, `30d` (different from stat endpoints).
-- **Cross-chain queries**: Require separate requests per network, then manual aggregation. Exception: `/multi_total_stat` and `/user_trading_volumes` aggregate automatically.
+- **Cross-chain queries**: Stat endpoints require separate requests per network. Exception: `/multi_total_stat` and `/user_trading_volumes` aggregate automatically. Cross-chain swaps use `/v2/cross_chain/quote` and `/v2/cross_chain/swap`.
+- **V2 API flexible input**: Swap/quote endpoints accept chain names (`"arbitrum"`) or IDs (`42161`), and token symbols (`"USDC"`) or addresses.
 - **Address format**: All EVM addresses should be checksummed.
 - **Paused networks**: `fantom`, `zksync`, `polygon_zkevm` are excluded from `/earn_summary`.
 

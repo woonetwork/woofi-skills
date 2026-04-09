@@ -12,10 +12,10 @@ triggers:
 
 ## Overview
 
-This skill queries the WOOFi `v1/quote` API to get aggregated token exchange rates and the expected received token amount for a specific chain. It does not generate or execute any transaction data.
+This skill queries the WOOFi `v2/quote` API to get aggregated token exchange rates and the expected received token amount for a specific chain. It does not generate or execute any transaction data.
 
 **Base URL**: `https://sapi.woofi.com`
-**Endpoint**: `POST /v1/quote`
+**Endpoint**: `POST /v2/quote`
 **Content-Type**: `application/json`
 
 ---
@@ -26,12 +26,43 @@ All parameters are passed in the JSON body.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `chain_id` | `integer` | Yes | - | Network chain ID (e.g., Base: `8453`, Arbitrum: `42161`, BSC: `56`, Polygon: `137`) |
-| `sell_token`| `string` | Yes | - | Address or symbol of token to sell (Native ETH/BNB/etc is `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`) |
-| `buy_token` | `string` | Yes | - | Address or symbol of token to buy |
-| `sell_amount`| `string` | Yes | - | Human-readable amount to sell (e.g., `"1.5"`) |
+| `chain` | `int \| str` | Yes | - | Chain ID (`42161`) or chain name (`"arbitrum"`). See chain name resolution below. |
+| `sell_token`| `str` | Yes | - | Token address (`"0xaf88..."`) or token symbol/name (`"USDC"`). Native ETH/BNB/etc resolves from symbol. |
+| `buy_token` | `str` | Yes | - | Token address or symbol/name of token to buy |
+| `sell_amount`| `str` | Yes | - | Human-readable amount to sell (e.g., `"1.5"`) |
 | `slippage_pct`| `float` | No | `0.5` | Max allowed slippage percentage |
-| `woofi_only`| `boolean` | No | `false` | If `true`, only sources quotes directly from WOOFi |
+| `woofi_only`| `bool` | No | `false` | If `true`, only sources quotes directly from WOOFi pools |
+
+### Chain Name Resolution
+
+Case-insensitive. Automatically strips spaces, dashes, underscores, and "chain"/"network" suffixes.
+
+| Chain ID | Accepted Names |
+|----------|---------------|
+| 1 | ethereum, eth, mainnet |
+| 10 | optimism, op |
+| 56 | bsc, bnb, binance, bnbchain, binancesmartchain |
+| 137 | polygon, matic, pol |
+| 143 | monad |
+| 146 | sonic |
+| 324 | zksync, zksyncera |
+| 999 | hyperevm, hyper |
+| 5000 | mantle |
+| 8453 | base |
+| 42161 | arbitrum, arb, arbi, arbitrumone |
+| 43114 | avalanche, avax |
+| 59144 | linea |
+| 80094 | berachain, bera |
+
+### Token Name Resolution
+
+Tokens can be specified by address or symbol/name. Resolution layers:
+1. **Local symbol index** — common tokens: WETH, USDC, USDT, WBTC, etc.
+2. **Static JSON manifests** — 30+ tokens per chain, indexed by symbol and name
+3. **Alias table** — native tokens and wrapped variants (e.g., `eth` -> WETH, `btc` -> WBTC)
+4. **External API fallback** (async) — queries Odos + 1inch APIs in parallel, results cached
+
+**Native tokens**: `"eth"` on Arbitrum, `"matic"` on Polygon, etc. resolve to `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`.
 
 ---
 
@@ -39,13 +70,13 @@ All parameters are passed in the JSON body.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `chain_id` | `integer` | Chain ID |
-| `sell_token` | `string` | Sell token address |
-| `buy_token` | `string` | Buy token address |
-| `sell_amount` | `string` | Sell amount requested |
-| `buy_amount` | `string` | Expected buy amount |
-| `price` | `string` | Current execution price |
-| `guaranteed_price` | `string` | Minimum guaranteed price after considering slippage |
+| `chain` | `int` | Chain ID |
+| `sell_token` | `str` | Resolved sell token address |
+| `buy_token` | `str` | Resolved buy token address |
+| `sell_amount` | `str` | Sell amount requested |
+| `buy_amount` | `str` | Expected buy amount |
+| `price` | `str` | Current execution price |
+| `guaranteed_price` | `str` | Minimum guaranteed price after considering slippage |
 
 ---
 
@@ -53,12 +84,12 @@ All parameters are passed in the JSON body.
 
 ### Getting a Quote for swapping USDC to WBTC on Arbitrum
 ```bash
-curl -X POST "https://sapi.woofi.com/v1/quote" \
+curl -X POST "https://sapi.woofi.com/v2/quote" \
   -H "Content-Type: application/json" \
   -d '{
-    "chain_id": 42161,
-    "sell_token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-    "buy_token": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+    "chain": "arbitrum",
+    "sell_token": "USDC",
+    "buy_token": "WBTC",
     "sell_amount": "1000"
   }'
 ```
@@ -66,7 +97,7 @@ curl -X POST "https://sapi.woofi.com/v1/quote" \
 ### Response Example
 ```json
 {
-  "chain_id": 42161,
+  "chain": 42161,
   "sell_token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
   "buy_token": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
   "sell_amount": "1000",
@@ -74,6 +105,18 @@ curl -X POST "https://sapi.woofi.com/v1/quote" \
   "price": "0.000015243",
   "guaranteed_price": "0.000015167"
 }
+```
+
+### Using chain ID instead of name
+```bash
+curl -X POST "https://sapi.woofi.com/v2/quote" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chain": 42161,
+    "sell_token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "buy_token": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+    "sell_amount": "1000"
+  }'
 ```
 
 ---
